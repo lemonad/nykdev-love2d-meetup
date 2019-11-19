@@ -6,7 +6,7 @@ local DEBUG = true
 
 local WIDTH = 800
 local HEIGHT = 600
-local g = 9.81
+local g = 0
 local pixels_per_meter = 64
 
 local t = 0
@@ -26,66 +26,48 @@ function love.load()
 
   -- shader = Shader()
   --
-  love.physics.setMeter(pixels_per_meter)
-  world = love.physics.newWorld(0, g * pixels_per_meter, true)
-
-  objects = {} -- table to hold all our physical objects
-
-  objects.ground = {}
-  objects.ground.body = love.physics.newBody(world, WIDTH / 2, HEIGHT - 50 / 2)
-  objects.ground.shape = love.physics.newRectangleShape(WIDTH, 50)
-  objects.ground.fixture = love.physics.newFixture(
-    objects.ground.body,
-    objects.ground.shape
-  )
-
-  objects.car = {}
-  objects.car.body = love.physics.newBody(world, WIDTH / 2, HEIGHT / 2, "dynamic")
-  objects.car.shape = love.physics.newRectangleShape(100, 30)
-  objects.car.fixture = love.physics.newFixture(
-    objects.car.body,
-    objects.car.shape,
-    1  -- density
-  )
-  objects.car.fixture:setRestitution(0.4)
+  car_pos = Vec2(WIDTH / 2, HEIGHT / 2)
+  car_speed = 200
 end
 
 function love.update(dt)
   t = t + dt
   -- shader.shader:send("time", t)
-  world:update(dt)
 
+  local fx = 0
+  local fy = 0
   if love.keyboard.isDown("right") then
-    objects.car.body:applyForce(400, 0)
+    car_pos.x = car_pos.x + car_speed * dt
   elseif love.keyboard.isDown("left") then
-    objects.car.body:applyForce(-400, 0)
+    car_pos.x = car_pos.x - car_speed * dt
+  elseif love.keyboard.isDown("up") then
+    car_pos.y = car_pos.y - car_speed * dt
+  elseif love.keyboard.isDown("down") then
+    car_pos.y = car_pos.y + car_speed * dt
   end
 end
 
 function love.keypressed(k)
   if k == "escape" then
     love.event.quit()
-  elseif k == "up" then
-    objects.car.body:setLinearVelocity(0, 0)
-    objects.car.body:applyLinearImpulse(0, -400)
   end
 end
 
 function love.draw()
   love.graphics.setBackgroundColor(Color:from_index(26):rgba())
 
-  -- Draw ground.
+  -- Draw upper and lower limits.
   love.graphics.setColor(Color:from_index(11):rgba())
   love.graphics.polygon(
     "fill",
-    objects.ground.body:getWorldPoints(objects.ground.shape:getPoints())
-  )
-
-  -- Draw car
-  love.graphics.setColor(Color:from_index(7):rgba())
-  love.graphics.polygon(
-    "fill",
-    objects.car.body:getWorldPoints(objects.car.shape:getPoints())
+    car_pos.x - 40,
+    car_pos.y - 30,
+    car_pos.x + 40,
+    car_pos.y - 30,
+    car_pos.x + 40,
+    car_pos.y + 30,
+    car_pos.x - 40,
+    car_pos.y + 30
   )
 
   -- Draw HUD
