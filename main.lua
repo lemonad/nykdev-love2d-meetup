@@ -1,6 +1,7 @@
 local Color = require "color"
 local Shader = require "shader"
 local Vec2 = require "vec2"
+local Camera = require "hump.camera"
 
 local DEBUG = true
 
@@ -11,6 +12,8 @@ local pixels_per_meter = 128
 
 local t = 0
 local points = 5
+
+local zoom = 1
 
 function love.load()
   math.randomseed(os.time())
@@ -37,34 +40,39 @@ function love.load()
   )
 
   car_pos = Vec2(WIDTH / 2, HEIGHT / 2)
-  hero_speed = 2000
+  hero_speed = 200
   hero_turn_speed = 2
   car_speed = 10
 
-  car = {}
-  car.body = love.physics.newBody(world, WIDTH / 2, HEIGHT / 2, "dynamic")
-  car.shape = love.physics.newRectangleShape(50, 80)
-  car.fixture = love.physics.newFixture(
-    car.body,
-    car.shape,
-    0.2  -- density
-  )
-  car.fixture:setRestitution(1.0)
-  car.body:setAngularDamping(5)
+  -- car = {}
+  -- car.body = love.physics.newBody(world, WIDTH / 2, HEIGHT / 2, "dynamic")
+  -- car.shape = love.physics.newRectangleShape(50, 80)
+  -- car.fixture = love.physics.newFixture(
+  --   car.body,
+  --   car.shape,
+  --   0.2  -- density
+  -- )
+  -- car.fixture:setRestitution(1.0)
+  -- car.body:setAngularDamping(5)
+
+  camera = Camera(WIDTH / 2, HEIGHT / 2)
 
   hero = {}
   hero.body = love.physics.newBody(world, WIDTH / 2, HEIGHT / 2, "dynamic")
   hero.shape = love.physics.newRectangleShape(80, 50)
+  hero.shape = love.physics.newRectangleShape(-45, 20, 5, 10)
   hero.fixture = love.physics.newFixture(
     hero.body,
     hero.shape,
-    0.3  -- density
+    3  -- density
   )
   hero.fixture:setRestitution(1.0)
   hero.body:setLinearDamping(0.5)
-  hero.body:setAngularDamping(500000000)
+  hero.body:setAngularDamping(500)
   hero_vector = nil
-  hero.body:setAngle(math.pi / 2)
+  hero.body:setAngle(-math.pi / 2)
+  hero.image = love.graphics.newImage("car.png")
+  hero.quad = love.graphics.newQuad(0, 0, 48, 64, 48, 64)
 
   tiles = {}
   for y = 1, 11 do
@@ -74,6 +82,8 @@ function love.load()
     end
   end
   background_offset = 0
+
+  other_cars = {}
 
   -- music = love.audio.newSource(".mp3", "stream")
   -- music:setLooping(true)
@@ -90,6 +100,9 @@ function love.update(dt)
   t = t + dt
   -- shader.shader:send("time", t)
   world:update(dt)
+
+  camera:zoom(zoom)
+  zoom = zoom - dt * 0.00001
 
   local fx = 0
   local fy = 0
@@ -108,13 +121,13 @@ function love.update(dt)
   local x = math.cos(angle)
   hero.body:applyForce(-x * fy, -y * fy)
 
-  -- hero.body:setAngle(angle + fx)
+  hero.body:setAngle(angle + fx)
 
-  local x, y = car.body:getPosition()
-  local dx = WIDTH / 2 - x
-  local dy = HEIGHT / 2 - y
+  -- local x, y = car.body:getPosition()
+  -- local dx = WIDTH / 2 - x
+  -- local dy = HEIGHT / 2 - y
 
-  car.body:applyForce(dx * dt * car_speed, dy * dt * car_speed)
+  -- car.body:applyForce(dx * dt * car_speed, dy * dt * car_speed)
 
   background_offset = background_offset + 100 * dt
   if background_offset > 60 then
@@ -128,6 +141,27 @@ function love.update(dt)
       tiles[1][x] = (love.math.random() > 0.95) and 11 or 10
     end
   end
+
+  if love.math.random() > 0.8 then
+    -- spawn car
+    local x = love.math.random() * (WIDTH - 150)
+    local y = -50
+
+    local car = {}
+    car.body = love.physics.newBody(world, x, y, "dynamic")
+    car.shape = love.physics.newRectangleShape(50, 80)
+    car.fixture = love.physics.newFixture(
+      car.body,
+      car.shape,
+      0.5  -- density
+    )
+    car.fixture:setRestitution(1.0)
+    car.body:setAngularDamping(0)
+    car.body:applyForce(0, car_speed * 200 * (0.5 + love.math.random() * 0.5))
+
+    other_cars[#other_cars + 1] = car
+  end
+
 end
 
 function love.keypressed(k)
@@ -137,8 +171,9 @@ function love.keypressed(k)
 end
 
 function love.draw()
-  love.graphics.setBackgroundColor(Color:from_index(26):rgba())
+  camera:attach()
 
+  love.graphics.setBackgroundColor(Color:from_index(26):rgba())
   -- Draw tiles
   for y = 1, 11 do
     for x = 1, 10 do
@@ -168,18 +203,35 @@ function love.draw()
   love.graphics.setColor(Color:from_index(11):rgba())
 
   -- Draw car
-  -- love.graphics.setColor(Color:from_index(7):rgba())
-  -- love.graphics.polygon(
-  --   "fill",
-  --   car.body:getWorldPoints(hero.shape:getPoints())
-  -- )
+  for i = 1, #other_cars do
+    love.graphics.setColor(Color:from_index(27):rgba())
+    love.graphics.polygon(
+      "fill",
+      other_cars[i].body:getWorldPoints(other_cars[i].shape:getPoints())
+    )
+  end
 
   -- Draw hero
   love.graphics.setColor(Color:from_index(8):rgba())
-  love.graphics.polygon(
-    "fill",
-    hero.body:getWorldPoints(hero.shape:getPoints())
-  )
+  love.graphics.draw(
+    hero.image,
+    hero.quad,
+    hero.body:getX(),
+    hero.body:getY(),
+    hero.body:getAngle(),
+    1, 1,
+    32, 32,
+    0, 0
+    )
+
+  -- Draw hero
+  -- love.graphics.setColor(Color:from_index(8):rgba())
+  -- love.graphics.polygon(
+  --   "fill",
+  --   hero.body:getWorldPoints(hero.shape:getPoints())
+  -- )
+
+  camera:detach()
 
   -- Draw HUD
   love.graphics.setColor(1, 1, 1)
